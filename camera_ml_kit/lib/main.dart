@@ -1,5 +1,4 @@
 import 'package:camera/camera.dart';
-import 'package:camera_ml_kit/ocr/ocr_scanner_view.dart';
 import 'package:flutter/material.dart';
 
 List<CameraDescription> cameras = [];
@@ -43,8 +42,97 @@ class _HomeViewState extends State<HomeView> {
   }
 
   navigateToCameraView(){
-    Navigator.push(context, MaterialPageRoute(builder: (context)=>OCRScannerView((text){
-
-    })));
+    Navigator.push(context, MaterialPageRoute(builder: (context)=>const CameraView()));
   }
 }
+
+class CameraView extends StatefulWidget {
+  final CameraLensDirection initialDirection;
+
+  const CameraView({Key? key, this.initialDirection = CameraLensDirection.back}) : super(key: key);
+  @override
+  _CameraViewState createState() => _CameraViewState();
+}
+
+class _CameraViewState extends State<CameraView> with WidgetsBindingObserver{
+  CameraController? _controller;
+  int _cameraIndex = 0;
+
+  @override
+  void dispose() {
+    disposeController();
+    WidgetsBinding.instance!.removeObserver(this);
+    debugPrint("...***...dispose...***...");
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance!.addObserver(this);
+    for (var i = 0; i < cameras.length; i++) {
+      if (cameras[i].lensDirection == widget.initialDirection) {
+        _cameraIndex = i;
+      }
+    }
+    initController();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return;
+    }
+    if (state == AppLifecycleState.inactive) {
+      disposeController();
+      debugPrint("...***...inactive dispose...***...");
+    } else if (state == AppLifecycleState.resumed) {
+      if (_controller != null) {
+        initController();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return cameraPreview();
+  }
+
+  Widget cameraPreview() {
+    if (_controller==null || _controller?.value.isInitialized == false) {
+      return Container();
+    }
+    return Container(
+      color: Colors.black,
+      child: CameraPreview(_controller!),
+    );
+  }
+
+  initController() async{
+    if (!mounted) {
+      return;
+    }
+    final CameraController cameraController = CameraController(cameras[0], ResolutionPreset.low, enableAudio: false);
+    _controller = cameraController;
+
+    try {
+      await cameraController.initialize().then((value){
+        cameraController.startImageStream((cameraImage){});
+      });
+    } on CameraException catch (e) {
+      debugPrint("...***...exception...***...");
+      debugPrint(e.toString());
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  disposeController(){
+    if(_controller!=null){
+      _controller?.dispose();
+    }
+  }
+
+}
+
